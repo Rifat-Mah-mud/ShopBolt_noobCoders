@@ -62,6 +62,7 @@ if (isset($_POST['login'])) {
             header("Location: index.html");
             exit();
             
+            
         } else {
             echo "Invalid Password!";
         }
