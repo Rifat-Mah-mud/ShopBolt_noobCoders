@@ -78,3 +78,14 @@ th:last-child{
     border-radius: 5px; 
     cursor: pointer; 
 }
+.quantity-input {
+    width: 60px;
+    display: inline-block;
+  }
+  
+  #cart-table img {
+    height: 50px;
+    object-fit: cover;
+    border-radius: 5px;
+  }
+  
