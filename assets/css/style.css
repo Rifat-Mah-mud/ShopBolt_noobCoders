@@ -31,39 +31,49 @@
     
 }
 
-/*Header & Nav*/
 
-/* Header and Navbar */
-header {
-    background-color: #fff;
-    padding: 15px 20px;
-    border-bottom: 1px solid #ddd;
-    display: flex;
+
+/* header{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    /* padding: 20px 10px; 
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
+    z-index: 99;
+    background: url(/Projrct1/assets/images/bg.jpg);
+} */
 .navbar {
     display: flex;
     align-items: center;
     justify-content: center;
     height: 40px;
     padding: 2px 0 !important; 
-    margin-right: 550px;
 }
 
-.navbar a {
-    position: relative;
-    align-items: center;
-    text-decoration: none;
-    color: #000;
-    font-size: 1rem;
-    padding: 0px 20px;
-    font-weight: 500;
-    transition: color 0.3s ease;
-    margin-left: 50px;
+.nav_logo img {
+    height: 80px; /* Adjust to match navbar height */
+    width: 70px; /* Maintain aspect ratio */
+    /* padding: 5px 5px; */
+    margin-left: 50px; 
+    margin-bottom: 0px; /* Prevent overflow */
+    justify-content: center;
 }
+
+.navbar a{
+    position: relative;
+    font-size: 1.1rem;
+    color: #000000;
+    text-decoration: none;
+    font-weight: 500;
+    margin-top: 15px;
+    padding: 0px 20px;
+    align-items: center;
+    line-height: 50px;
+
+}
+
 
 .navbar a::after {
     content: '';
@@ -82,20 +92,7 @@ header {
     transform-origin: center;
     transform: scaleX(1);
 }
-.nav_logo {
-    display: flex;
-    align-items: center;
-}
 
-.nav_logo img {
-    width: 80px;
-    height: auto;
-    transition: transform 0.3s ease;
-}
-
-.nav_logo img:hover {
-    transform: scale(1.05);
-}
 
 
 
@@ -509,4 +506,22 @@ footer form button:hover {
 }
 
 /* ====== End of 1.14. Footer section ====== */
-
+body {
+    font-family: 'Segoe UI', sans-serif;
+  }
+  
+  .navbar a {
+    color: #333;
+    margin-right: 15px;
+    font-weight: 500;
+  }
+  
+  .navbar a:hover {
+    color: #0d6efd;
+  }
+  
+  footer {
+    background: #222;
+    color: white;
+  }
+  

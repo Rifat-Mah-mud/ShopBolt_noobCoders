@@ -47,27 +47,19 @@ function showSection(id) {
     const row = button.closest("tr");
     const cells = row.querySelectorAll("td");
   
-    // Extract values
     const name = cells[1].textContent;
     const price = cells[2].textContent;
     const category = cells[3].textContent;
     const stock = cells[4].textContent;
     const description = row.getAttribute("data-description");
   
-    // Populate form
     document.getElementById("name").value = name;
     document.getElementById("price").value = price;
     document.getElementById("category").value = category;
     document.getElementById("stock").value = stock;
     document.getElementById("description").value = description;
   
-    // Remove the original row
     row.remove();
-  
-    // Show the form
     showSection("create");
   }
   
-
-
-

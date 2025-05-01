@@ -1,0 +1,80 @@
+Array
+(
+    [cart] => Array
+        (
+            [0] => Array
+                (
+                    [img] => assets/images/Product/headphones.jpg
+                    [title] => Wireless Headphones
+                    [desc] => Noise-Canceling
+                    [price] => $150
+                    [quantity] => 1
+                )
+
+        )
+
+    [subtotal] => 150
+    [discount] => 0
+    [shipping] => 10
+    [total] => 160
+)
+Array
+(
+    [cart] => Array
+        (
+            [0] => Array
+                (
+                    [img] => assets/images/Product/headphones.jpg
+                    [title] => Wireless Headphones
+                    [desc] => Noise-Canceling
+                    [price] => $150
+                    [quantity] => 1
+                )
+
+        )
+
+    [subtotal] => 150
+    [discount] => 0
+    [shipping] => 10
+    [total] => 160
+)
+Array
+(
+    [cart] => Array
+        (
+            [0] => Array
+                (
+                    [img] => assets/images/Product/headphones.jpg
+                    [title] => Wireless Headphones
+                    [desc] => Noise-Canceling
+                    [price] => $150
+                    [quantity] => 1
+                )
+
+        )
+
+    [subtotal] => 150
+    [discount] => 0
+    [shipping] => 10
+    [total] => 160
+)
+Array
+(
+    [cart] => Array
+        (
+            [0] => Array
+                (
+                    [img] => assets/images/Product/headphones.jpg
+                    [title] => Wireless Headphones
+                    [desc] => Noise-Canceling
+                    [price] => $150
+                    [quantity] => 1
+                )
+
+        )
+
+    [subtotal] => 150
+    [discount] => 0
+    [shipping] => 10
+    [total] => 160
+)

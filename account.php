@@ -1,325 +1,254 @@
 <?php
 session_start();
+include("db_connect/db_connect.php");
 
-// Redirect to login if not logged in
-if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
-    header('Location: login.php');
+// Session timeout logic
+$timeout_duration = 600;
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header("Location: login.php");
+    exit;
+}
+if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $timeout_duration) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php?timeout=1");
+    exit;
+}
+$_SESSION['last_activity'] = time();
+
+$username = $_SESSION['username'] ?? "Guest";
+$email = $_SESSION['email'] ?? "Not available";
+$user_id = $_SESSION['user_id'] ?? 0;
+
+// Logout logic
+if (isset($_GET['logout'])) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php");
     exit;
 }
 
-// Handle logout
-if (isset($_GET['logout'])) {
-    if (isset($_SESSION['logged_in'])) {
-        unset($_SESSION['logged_in']);
-        unset($_SESSION['email']);
-        unset($_SESSION['username']);
-        unset($_SESSION['user_id']);
-        header('Location: login.php');
-        exit;
+// Fetch orders
+$orders = [];
+if ($user_id) {
+    $stmt = $conn->prepare("
+        SELECT o.id AS order_id, o.order_date, o.subtotal, o.discount, o.shipping, o.total, 
+               oi.quantity, oi.price, p.title AS product_name
+        FROM orders o
+        JOIN order_items oi ON o.id = oi.order_id
+        JOIN products p ON oi.product_id = p.id
+        WHERE o.user_id = ?
+        ORDER BY o.order_date DESC
+    ");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $orders[] = $row;
     }
+    $stmt->close();
 }
 
 // Handle password change
-if (isset($_POST['change_password'])) {
-    include("db_connect/db_connect.php");
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
+    $current_password = $_POST['current_password'];
+    $new_password = $_POST['new_password'];
+    $confirm_password = $_POST['confirm_password'];
 
-    $currentPassword = trim($_POST['current_password']);
-    $newPassword = trim($_POST['password']);
-    $confirmPassword = trim($_POST['confirmPassword']);
-    $user_id = $_SESSION['user_id'];
-
-    // Validate input
-    if (empty($currentPassword) || empty($newPassword) || empty($confirmPassword)) {
-        echo "<script>
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'All fields are required!'
-                });
-              </script>";
-    } elseif ($newPassword !== $confirmPassword) {
-        echo "<script>
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'New passwords do not match!'
-                });
-              </script>";
-    } elseif (strlen($newPassword) < 6) {
-        echo "<script>
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'New password must be at least 6 characters long!'
-                });
-              </script>";
+    if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
+        $error_message = "All fields are required.";
+    } elseif ($new_password !== $confirm_password) {
+        $error_message = "New password and confirmation do not match.";
     } else {
-        // Verify current password
-        $sql = "SELECT password FROM users WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-
-        if (!$stmt) {
-            echo "<script>
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Database error: " . addslashes($conn->error) . "'
-                    });
-                  </script>";
-            exit;
-        }
-
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
         $stmt->bind_param("i", $user_id);
         $stmt->execute();
         $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
 
-        if ($result->num_rows > 0) {
-            $row = $result->fetch_assoc();
-            if (password_verify($currentPassword, $row['password'])) {
-                // Current password is correct, proceed to update new password
-                $hashed_password = password_hash($newPassword, PASSWORD_DEFAULT);
-
-                $update_sql = "UPDATE users SET password = ? WHERE id = ?";
-                $update_stmt = $conn->prepare($update_sql);
-
-                if (!$update_stmt) {
-                    echo "<script>
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: 'Database error: " . addslashes($conn->error) . "'
-                            });
-                          </script>";
-                    exit;
-                }
-
-                $update_stmt->bind_param("si", $hashed_password, $user_id);
-
-                if ($update_stmt->execute()) {
-                    echo "<script>
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Success',
-                                text: 'Password Change Successfully',
-                                showConfirmButton: false,
-                                timer: 1500
-                            });
-                          </script>";
-                } else {
-                    echo "<script>
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: 'Failed to change password: " . addslashes($update_stmt->error) . "'
-                            });
-                          </script>";
-                }
-
-                $update_stmt->close();
-            } else {
-                echo "<script>
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: 'Current password is incorrect!'
-                        });
-                      </script>";
-            }
+        if ($row && password_verify($current_password, $row['password'])) {
+            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $stmt->bind_param("si", $hashed_password, $user_id);
+            $stmt->execute();
+            $stmt->close();
+            $success_message = "Password changed successfully.";
         } else {
-            echo "<script>
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'User not found!'
-                    });
-                  </script>";
+            $error_message = "Current password is incorrect.";
         }
-
-        $stmt->close();
-        $conn->close();
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shop - Account</title>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <link rel="stylesheet" href="path/to/font-awesome/css/font-awesome.min.css">
+    <title>Account</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/easy.css">
-    <link rel="stylesheet" href="assets/css/account.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
-    <!-- New Nav -->
-    <header>
-        <nav class="navbar">
-            <a href="index.php">Home</a>
-            <a href="about.html">About</a>
-            <a href="shop.html">Shop</a>
-            <a href="contact.html">Contact</a>
-            <a href="account.php">Account</a>
-            <a href="cart.php">Cart</a>
-        </nav>
-        <a href="index.php" class="nav_logo">
-            <img src="assets/images/logo.png" alt="Logo">
-        </a>
-    </header>
 
-    <!-- Account Info -->
-    <section class="my-5 py-5">
-        <div class="row container mx-auto">
-            <div class="text-center mt-3 pt-5 col-lg-6 col-md-12 col-sm-12">
-                <h3 class="font-weight-bold">Account Info</h3>
-                <hr class="mx-auto">
-                <div class="account-info">
-                    <p><span><?php echo htmlspecialchars($_SESSION['username']); ?></span></p>
-                    <p><span><?php echo htmlspecialchars($_SESSION['email']); ?></span></p>
-                    <p><a href="#orders" id="order-btn">Your Orders</a></p>
-                    <p><a href="account.php?logout=1" id="logout-btn">Logout</a></p>
-                </div>
-            </div>
+<header>
+    <nav class="navbar">
+        <a href="index.php">Home</a>
+        <a href="about.php">About</a>
+        <a href="shop.php">Shop</a>
+        <a href="contact.php">Contact</a>
+        <a href="account.php">Account</a>
+        <a href="cart.php">Cart</a>
+    </nav>
+    <a href="index.php" class="nav_logo">
+        <img src="assets/images/logo.png" alt="Logo">
+    </a>
+</header>
 
-            <div class="col-lg-6 col-md-12 col-sm-12">
-                <form action="account.php" method="post" id="account-form">
-                    <h3>Change Password</h3>
-                    <hr class="mx-auto">
-                    <div class="form-group">
-                        <label for="current-password">Current Password</label>
-                        <input type="password" class="form-control" id="current-password" name="current_password" placeholder="Current Password" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="account-password">New Password</label>
-                        <input type="password" class="form-control" id="account-password" name="password" placeholder="New Password" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="account-password-confirm">Confirm New Password</label>
-                        <input type="password" class="form-control" id="account-password-confirm" name="confirmPassword" placeholder="Confirm New Password" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="hidden" name="change_password" value="1">
-                        <input type="submit" value="Change Password" class="btn" id="change-pass-btn">
-                    </div>
-                </form>
-            </div>
+<section class="container my-5 py-5">
+    <div class="row">
+        <!-- Account Info -->
+        <div class="col-lg-6">
+            <h3>Account Info</h3>
+            <p><strong>Username:</strong> <?= htmlspecialchars($username) ?></p>
+            <p><strong>Email:</strong> <?= htmlspecialchars($email) ?></p>
+            <p><a href="account.php?logout=1" class="btn btn-outline-danger">Logout</a></p>
         </div>
-    </section>
 
-    <!-- Footer -->
-    <footer id="contact">
-        <div class="container">
-            <div class="footer-hr flex flex-col">
-                <div class="flex gap-1">
-                    <hr>
-                    <h6>Newsletter</h6>
+        <!-- Order History -->
+        <div class="col-lg-6">
+            <h3>Your Orders</h3>
+            <?php if (count($orders) > 0): ?>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Date</th>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Subtotal</th>
+                            <th>Discount</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($orders as $order): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($order['order_id']) ?></td>
+                                <td><?= htmlspecialchars($order['order_date']) ?></td>
+                                <td><?= htmlspecialchars($order['product_name']) ?></td>
+                                <td><?= htmlspecialchars($order['quantity']) ?></td>
+                                <td>$<?= number_format($order['price'], 2) ?></td>
+                                <td>$<?= number_format($order['subtotal'], 2) ?></td>
+                                <td>$<?= number_format($order['discount'], 2) ?></td>
+                                <td>$<?= number_format($order['total'], 2) ?></td>
+                                <td>Completed</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p>You have no orders yet.</p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Rental Requests -->
+        <div class="col-lg-12 mt-5">
+            <h3>Your Rental Requests</h3>
+            <?php
+            $rental_requests = [];
+            $stmt = $conn->prepare("
+                SELECT r.id, p.title AS product_name, r.renter_name, r.renter_email, r.rental_duration, r.notes, r.created_at, r.status
+                FROM rental_requests r
+                JOIN products p ON r.product_id = p.id
+                WHERE r.renter_email = ?
+                ORDER BY r.created_at DESC
+            ");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $rental_requests[] = $row;
+            }
+            $stmt->close();
+            ?>
+
+            <?php if (count($rental_requests) > 0): ?>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Product</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Duration</th>
+                            <th>Notes</th>
+                            <th>Requested At</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($rental_requests as $request): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($request['id']) ?></td>
+                                <td><?= htmlspecialchars($request['product_name']) ?></td>
+                                <td><?= htmlspecialchars($request['renter_name']) ?></td>
+                                <td><?= htmlspecialchars($request['renter_email']) ?></td>
+                                <td><?= htmlspecialchars($request['rental_duration']) ?> day(s)</td>
+                                <td><?= htmlspecialchars($request['notes']) ?></td>
+                                <td><?= htmlspecialchars($request['created_at']) ?></td>
+                                <td>
+                                    <?php if ($request['status'] === 'Approved'): ?>
+                                        <span class="badge bg-success">Approved</span>
+                                    <?php elseif ($request['status'] === 'Rejected'): ?>
+                                        <span class="badge bg-danger">Rejected</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary">Pending</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p>You have not made any rental requests yet.</p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Change Password -->
+        <div class="col-lg-6 mt-5">
+            <h3>Change Password</h3>
+            <?php if (isset($error_message)): ?>
+                <div class="alert alert-danger"><?= $error_message ?></div>
+            <?php elseif (isset($success_message)): ?>
+                <div class="alert alert-success"><?= $success_message ?></div>
+            <?php endif; ?>
+
+            <form action="account.php" method="POST">
+                <div class="mb-3">
+                    <label for="current_password" class="form-label">Current Password</label>
+                    <input type="password" name="current_password" class="form-control" required>
                 </div>
-                <h3>Join Our Mailing List</h3>
-                <p class="text-center">Lorem ipsum dolor sit amet consectetur adipisicing elit. Rerum nam iure quis ea iste suscipit.</p>
-            </div>
-            <form action="#" id="footer-form" class="flex flex-sb gap-2">
-                <div id="footer-message"></div>
-                <input type="email" required placeholder="Enter your email">
-                <button type="submit" class="btn_hover1">Get Started</button>
+                <div class="mb-3">
+                    <label for="new_password" class="form-label">New Password</label>
+                    <input type="password" name="new_password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                    <input type="password" name="confirm_password" class="form-control" required>
+                </div>
+                <button type="submit" name="change_password" class="btn btn-primary">Change Password</button>
             </form>
         </div>
-        <div class="footer-menu">
-            <div class="container">
-                <div class="flex flex-start footer-center">
-                    <div class="w-33 mt-2 flex-col gap-2 flex-start">
-                        <a href="index.php"><img src="assets/images/logo.png" alt="footer-logo"></a>
-                        <p class="mt-2">Lorem ipsum dolor sit amet consectetur adipisicing elit. Magnam, adipisci?</p>
-                        <span class="flex gap-20 mt-15">
-                            <a href="#"><i class="bi bi-facebook"></i></a>
-                            <a href="#"><i class="bi bi-instagram"></i></a>
-                            <a href="#"><i class="bi bi-twitter-x"></i></a>
-                            <a href="#"><i class="bi bi-linkedin"></i></a>
-                        </span>
-                    </div>
-                    <div class="w-16 mt-1">
-                        <h4>Quick Links</h4>
-                        <ul class="flex flex-col gap-20 flex-start">
-                            <li><a href="index.php">Home</a></li>
-                            <li><a href="about.html">About</a></li>
-                            <li><a href="#">Portfolio</a></li>
-                            <li><a href="#">Blogs</a></li>
-                        </ul>
-                    </div>
-                    <div class="w-16 mt-45 flex-end">
-                        <ul class="flex flex-col gap-20 flex-start">
-                            <li><a href="#">FAQ</a></li>
-                            <li><a href="contact.html">Contact</a></li>
-                            <li><a href="#">Team</a></li>
-                            <li><a href="#">Privacy Policy</a></li>
-                        </ul>
-                    </div>
-                    <div class="w-33 mt-1 flex flex-col flex-start">
-                        <h4>Get Connected</h4>
-                        <ul class="flex flex-col gap-2 flex-start">
-                            <li>
-                                <a href="#"><i class="bi bi-envelope"></i></a>
-                                <a href="#" class="text-lowercase">youname@gmail.com</a>
-                            </li>
-                            <li>
-                                <a href="#"><i class="bi bi-telephone"></i></a>
-                                <a href="#">+123-456-7890</a>
-                            </li>
-                            <li>
-                                <a href="#"><i class="bi bi-clock"></i></a>
-                                <a href="#">Office-Hours: 8AM - 11PM Sunday - Weekend Day</a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="copyright">
-            <div class="container flex flex-sb gap-20 flex-warp">
-                <h6>Copyright © 2024 Coded by <a href="index.php" class="p-0">NoobCoders</a></h6>
-                <h6>Powered By <b>Prisom</b></h6>
-            </div>
-        </div>
-    </footer>
+    </div>
+</section>
 
-    <!-- Ensure Bootstrap Icons and Font Awesome are included -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-whGJZ8Iq3uPB4VyCMFSTOKR3pJ5ZFL9XKFlHyLtvEYpD6c3dM6spJot49LMB0WTR" crossorigin="anonymous"></script>
-    <script src="assets/js/script.js"></script>
-    <script>
-        // Client-side validation for password match and length
-        document.getElementById('account-form').addEventListener('submit', function(e) {
-            const currentPassword = document.getElementById('current-password').value;
-            const newPassword = document.getElementById('account-password').value;
-            const confirmPassword = document.getElementById('account-password-confirm').value;
+<footer class="footer text-center mt-5">
+    <p>&copy; 2025 Shopbolt | Designed by NoobCoders</p>
+</footer>
 
-            if (!currentPassword || !newPassword || !confirmPassword) {
-                e.preventDefault();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'All fields are required!'
-                });
-            } else if (newPassword !== confirmPassword) {
-                e.preventDefault();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'New passwords do not match!'
-                });
-            } else if (newPassword.length < 6) {
-                e.preventDefault();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'New password must be at least 6 characters long!'
-                });
-            }
-        });
-    </script>
 </body>
 </html>

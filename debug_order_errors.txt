@@ -1,0 +1,8 @@
+Missing product_id in item: Array
+(
+    [img] => assets/images/Product/drone.png
+    [title] => Drone AX RoX
+    [desc] => Drone Camera Full Set
+    [price] => $990
+    [quantity] => 1
+)

@@ -1,17 +1,12 @@
 <?php
-// db_connect.php
+$host = "localhost";
+$username = "root";
+$password = "";
+$dbname = "shopbolt"; // Your database name
 
-$servername = "localhost";
-$username = "root"; // Your database username
-$password = "";     // Your database password (leave empty for default local setup)
-$database = "shopbolt"; // Your database name
+$conn = new mysqli($host, $username, $password, $dbname);
 
-// Create connection
-$conn = new mysqli($servername, $username, $password, $database);
-
-// Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 ?>
-
